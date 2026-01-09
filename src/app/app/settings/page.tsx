@@ -32,9 +32,7 @@ export default function SettingsPage() {
     }
 
     load();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
   const canSave = useMemo(() => loaded && !saving, [loaded, saving]);
@@ -44,7 +42,6 @@ export default function SettingsPage() {
     setSaving(true);
     setMsg(null);
 
-    const now = new Date().toISOString();
     const payload: Settings = {
       id: "default",
       businessName: businessName.trim() || undefined,
@@ -52,7 +49,7 @@ export default function SettingsPage() {
       email: email.trim() || undefined,
       address: address.trim() || undefined,
       terms: terms.trim() || undefined,
-      updatedAt: now,
+      updatedAt: new Date().toISOString(),
     };
 
     await db.settings.put(payload);
@@ -63,39 +60,74 @@ export default function SettingsPage() {
 
   return (
     <div style={{ display: "grid", gap: 12, maxWidth: 900 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+      <style>{`
+        .top{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+        .h1{ font-size:22px; font-weight:950; letter-spacing:-0.4px; }
+        .sub{ opacity:0.75; margin-top:4px; }
+        .card{ padding:14px; border-radius:18px; border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03); display:grid; gap:12px; }
+        .grid{
+          display:grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap:12px;
+        }
+        @media (max-width: 860px){
+          .grid{ grid-template-columns: 1fr; }
+        }
+        .label{ font-size:12.5px; opacity:0.78; font-weight:850; margin-bottom:6px; }
+        .input, .textarea{
+          width:100%;
+          padding:12px 12px;
+          border-radius:16px;
+          background:rgba(0,0,0,0.22);
+          border:1px solid rgba(255,255,255,0.12);
+          color:rgba(234,240,255,0.92);
+          outline:none;
+        }
+        .textarea{ min-height:140px; resize:vertical; }
+        .btnPrimary{
+          display:inline-flex; align-items:center; justify-content:center;
+          padding:12px 14px; border-radius:16px; font-weight:950;
+          color:#0B0F1D;
+          background:linear-gradient(135deg, rgba(255,168,76,1), rgba(255,214,170,1));
+          border:1px solid rgba(255,255,255,0.16);
+          cursor:pointer;
+          width: fit-content;
+        }
+        @media (max-width: 860px){ .btnPrimary{ width: 100%; } }
+      `}</style>
+
+      <div className="top">
         <div>
-          <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: -0.4 }}>Settings</div>
-          <div style={{ opacity: 0.75, marginTop: 4 }}>Quote template defaults (V1).</div>
+          <div className="h1">Settings</div>
+          <div className="sub">Quote template defaults (V1).</div>
         </div>
-        <a href="/app" style={ghostBtn}>← Back</a>
       </div>
 
-      <div style={card}>
-        <div style={grid2}>
+      <div className="card">
+        <div className="grid">
           <Field label="Business name">
-            <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={input} placeholder="e.g. BuildU Roofing" />
+            <input className="input" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. BuildU Roofing" />
           </Field>
 
           <Field label="Phone">
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} style={input} placeholder="e.g. 07..." />
+            <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. 07…" />
           </Field>
 
           <Field label="Email">
-            <input value={email} onChange={(e) => setEmail(e.target.value)} style={input} placeholder="e.g. hello@..." />
+            <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. hello@…" />
           </Field>
 
           <Field label="Business address">
-            <input value={address} onChange={(e) => setAddress(e.target.value)} style={input} placeholder="Optional" />
+            <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Optional" />
           </Field>
         </div>
 
         <Field label="Default terms (shown in messages / later on PDF)">
-          <textarea value={terms} onChange={(e) => setTerms(e.target.value)} style={textarea} />
+          <textarea className="textarea" value={terms} onChange={(e) => setTerms(e.target.value)} />
         </Field>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={save} disabled={!canSave} style={{ ...primaryBtn, opacity: canSave ? 1 : 0.55 }}>
+          <button type="button" onClick={save} disabled={!canSave} className="btnPrimary" style={{ opacity: canSave ? 1 : 0.55 }}>
             {saving ? "Saving…" : "Save settings"}
           </button>
           {msg ? <div style={{ opacity: 0.85, fontWeight: 900 }}>{msg}</div> : null}
@@ -119,61 +151,3 @@ const defaultTerms =
   "• Payment due on completion unless agreed otherwise.\n" +
   "• Any additional work will be quoted before proceeding.\n" +
   "• Materials subject to availability.";
-
-const card: React.CSSProperties = {
-  padding: 14,
-  borderRadius: 18,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(255,255,255,0.03)",
-  display: "grid",
-  gap: 12,
-};
-
-const grid2: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 12,
-};
-
-const input: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 14,
-  background: "rgba(0,0,0,0.20)",
-  border: "1px solid rgba(255,255,255,0.12)",
-  color: "rgba(234,240,255,0.92)",
-  outline: "none",
-};
-
-const textarea: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 14,
-  minHeight: 140,
-  resize: "vertical",
-  background: "rgba(0,0,0,0.20)",
-  border: "1px solid rgba(255,255,255,0.12)",
-  color: "rgba(234,240,255,0.92)",
-  outline: "none",
-};
-
-const primaryBtn: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "10px 12px",
-  borderRadius: 14,
-  fontWeight: 950,
-  color: "#0B0F1D",
-  background: "linear-gradient(135deg, rgba(255,168,76,1), rgba(255,214,170,1))",
-  border: "1px solid rgba(255,255,255,0.16)",
-  cursor: "pointer",
-};
-
-const ghostBtn: React.CSSProperties = {
-  textDecoration: "none",
-  color: "rgba(234,240,255,0.82)",
-  padding: "10px 12px",
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(0,0,0,0.12)",
-  fontWeight: 900,
-};

@@ -18,7 +18,7 @@ export default function QuotesPage() {
     }
 
     load();
-    const t = setInterval(load, 800);
+    const t = setInterval(load, 900);
     return () => {
       alive = false;
       clearInterval(t);
@@ -29,7 +29,7 @@ export default function QuotesPage() {
     const query = q.trim().toLowerCase();
     return quotes.filter((qt) => {
       const matchesStatus = status === "all" ? true : qt.status === status;
-      const blob = `${qt.customerName} ${qt.address ?? ""} ${qt.notes ?? ""}`.toLowerCase();
+      const blob = `${qt.customerName} ${(qt as any).address ?? ""} ${(qt as any).notes ?? ""}`.toLowerCase();
       const matchesQ = query ? blob.includes(query) : true;
       return matchesStatus && matchesQ;
     });
@@ -37,25 +37,123 @@ export default function QuotesPage() {
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+      <style>{`
+        .top {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          flex-wrap: wrap;
+          align-items: flex-end;
+        }
+        .h1 { font-size: 22px; font-weight: 950; letter-spacing: -0.4px; }
+        .sub { opacity: 0.75; margin-top: 4px; }
+
+        .btnPrimary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 12px 14px;
+          border-radius: 16px;
+          font-weight: 950;
+          text-decoration: none;
+          color: #0B0F1D;
+          background: linear-gradient(135deg, rgba(255,168,76,1), rgba(255,214,170,1));
+          border: 1px solid rgba(255,255,255,0.16);
+          min-width: 160px;
+        }
+
+        .filters { display: flex; gap: 10px; flex-wrap: wrap; }
+        .input, .select {
+          padding: 12px 12px;
+          border-radius: 16px;
+          background: rgba(0,0,0,0.22);
+          border: 1px solid rgba(255,255,255,0.12);
+          color: rgba(234,240,255,0.92);
+          outline: none;
+        }
+        .input { flex: 1 1 260px; }
+        .select { flex: 1 1 180px; }
+
+        .panel {
+          border-radius: 18px;
+          border: 1px solid rgba(255,255,255,0.10);
+          background: rgba(255,255,255,0.03);
+          overflow: hidden;
+        }
+
+        /* Desktop table */
+        .tableHead, .tableRow {
+          display: grid;
+          grid-template-columns: 1.2fr 0.7fr 0.7fr 1fr;
+          gap: 10px;
+          padding: 12px 14px;
+        }
+        .tableHead {
+          border-bottom: 1px solid rgba(255,255,255,0.08);
+          font-size: 12.5px;
+          opacity: 0.8;
+          font-weight: 850;
+        }
+        .tableRow {
+          text-decoration: none;
+          color: rgba(234,240,255,0.94);
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        /* Mobile cards */
+        .cards { display: none; padding: 12px; gap: 10px; }
+        .cardRow {
+          display: grid;
+          gap: 8px;
+          padding: 12px;
+          border-radius: 16px;
+          border: 1px solid rgba(255,255,255,0.10);
+          background: rgba(0,0,0,0.18);
+          text-decoration: none;
+          color: rgba(234,240,255,0.94);
+        }
+        .rowTop {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          align-items: center;
+        }
+        .name { font-weight: 950; letter-spacing: -0.2px; }
+        .meta {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          font-size: 12.5px;
+          opacity: 0.82;
+        }
+
+        @media (max-width: 860px){
+          .btnPrimary { width: 100%; }
+          .filters { display: grid; grid-template-columns: 1fr; }
+          .input, .select { width: 100%; }
+
+          .tableHead, .tableRow { display: none; }
+          .cards { display: grid; }
+        }
+      `}</style>
+
+      <div className="top">
         <div>
-          <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: -0.4 }}>Quotes</div>
-          <div style={{ opacity: 0.75, marginTop: 4 }}>Draft, send, win.</div>
+          <div className="h1">Quotes</div>
+          <div className="sub">Draft, send, win.</div>
         </div>
 
-        <a href="/app/quotes/new" style={primaryBtn}>
-          + New quote
-        </a>
+        <a href="/app/quotes/new" className="btnPrimary">+ New quote</a>
       </div>
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className="filters">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search customer, address…"
-          style={input}
+          className="input"
         />
-        <select value={status} onChange={(e) => setStatus(e.target.value as any)} style={select}>
+        <select value={status} onChange={(e) => setStatus(e.target.value as any)} className="select">
           <option value="all">All statuses</option>
           <option value="draft">Draft</option>
           <option value="sent">Sent</option>
@@ -64,27 +162,41 @@ export default function QuotesPage() {
         </select>
       </div>
 
-      <div style={table}>
-        <div style={thead}>
-          <div>Customer</div>
-          <div>Status</div>
-          <div>Total</div>
-          <div>Updated</div>
+      <div className="panel">
+        {/* Desktop table */}
+        <div className="tableHead">
+          <div>Customer</div><div>Status</div><div>Total</div><div>Updated</div>
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ padding: 14, opacity: 0.75 }}>
-            No quotes yet. Create your first one.
-          </div>
+          <div style={{ padding: 14, opacity: 0.75 }}>No quotes yet. Create your first one.</div>
         ) : (
-          filtered.map((qt) => (
-            <a key={qt.id} href={`/app/quotes/${qt.id}`} style={row}>
-              <div style={{ fontWeight: 900 }}>{qt.customerName}</div>
-              <div><StatusPill status={qt.status} /></div>
-              <div style={{ opacity: 0.9, fontWeight: 900 }}>£{formatMoney(total(qt))}</div>
-              <div style={{ opacity: 0.75, fontSize: 12.5 }}>{formatDate(qt.updatedAt)}</div>
-            </a>
-          ))
+          <>
+            {filtered.map((qt) => (
+              <a key={qt.id} href={`/app/quotes/${qt.id}`} className="tableRow">
+                <div style={{ fontWeight: 900 }}>{qt.customerName}</div>
+                <div><StatusPill status={qt.status} /></div>
+                <div style={{ opacity: 0.9, fontWeight: 900 }}>£{money(total(qt))}</div>
+                <div style={{ opacity: 0.75, fontSize: 12.5 }}>{fmtDate(qt.updatedAt)}</div>
+              </a>
+            ))}
+
+            {/* Mobile cards */}
+            <div className="cards">
+              {filtered.map((qt) => (
+                <a key={qt.id} href={`/app/quotes/${qt.id}`} className="cardRow">
+                  <div className="rowTop">
+                    <div className="name">{qt.customerName}</div>
+                    <StatusPill status={qt.status} />
+                  </div>
+                  <div className="meta">
+                    <div style={{ fontWeight: 900 }}>£{money(total(qt))}</div>
+                    <div>{fmtDate(qt.updatedAt)}</div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -92,14 +204,17 @@ export default function QuotesPage() {
 }
 
 function total(q: Quote) {
-  return (q.lines ?? []).reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0);
+  return ((q as any).lines ?? []).reduce(
+    (sum: number, l: any) => sum + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0),
+    0
+  );
 }
 
-function formatMoney(n: number) {
+function money(n: number) {
   return (Math.round(n * 100) / 100).toFixed(2);
 }
 
-function formatDate(iso?: string) {
+function fmtDate(iso?: string) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
@@ -118,77 +233,19 @@ function StatusPill({ status }: { status: QuoteStatus }) {
     status === "accepted" ? "rgba(90,255,160,0.16)" :
     "rgba(255,90,90,0.14)";
 
-  return <span style={{ ...pill, background: bg }}>{label}</span>;
+  return (
+    <span style={{
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "6px 10px",
+      borderRadius: 999,
+      fontWeight: 900,
+      fontSize: 12,
+      border: "1px solid rgba(255,255,255,0.10)",
+      background: bg
+    }}>
+      {label}
+    </span>
+  );
 }
-
-const table: React.CSSProperties = {
-  borderRadius: 16,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(255,255,255,0.03)",
-  overflow: "hidden",
-};
-
-const thead: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1.2fr 0.7fr 0.7fr 1fr",
-  gap: 10,
-  padding: "12px 14px",
-  borderBottom: "1px solid rgba(255,255,255,0.08)",
-  fontSize: 12.5,
-  opacity: 0.8,
-  fontWeight: 850,
-};
-
-const row: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1.2fr 0.7fr 0.7fr 1fr",
-  gap: 10,
-  padding: "12px 14px",
-  textDecoration: "none",
-  color: "rgba(234,240,255,0.94)",
-  borderBottom: "1px solid rgba(255,255,255,0.06)",
-};
-
-const pill: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "6px 10px",
-  borderRadius: 999,
-  fontWeight: 900,
-  fontSize: 12,
-  border: "1px solid rgba(255,255,255,0.10)",
-};
-
-const input: React.CSSProperties = {
-  flex: "1 1 260px",
-  padding: "10px 12px",
-  borderRadius: 14,
-  background: "rgba(0,0,0,0.20)",
-  border: "1px solid rgba(255,255,255,0.12)",
-  color: "rgba(234,240,255,0.92)",
-  outline: "none",
-};
-
-const select: React.CSSProperties = {
-  flex: "0 0 200px",
-  padding: "10px 12px",
-  borderRadius: 14,
-  background: "rgba(0,0,0,0.20)",
-  border: "1px solid rgba(255,255,255,0.12)",
-  color: "rgba(234,240,255,0.92)",
-  outline: "none",
-};
-
-const primaryBtn: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "10px 12px",
-  borderRadius: 14,
-  fontWeight: 950,
-  textDecoration: "none",
-  color: "#0B0F1D",
-  background: "linear-gradient(135deg, rgba(255,168,76,1), rgba(255,214,170,1))",
-  border: "1px solid rgba(255,255,255,0.16)",
-};
