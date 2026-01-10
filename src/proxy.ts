@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Create a response we can attach cookies to
   let response = NextResponse.next({ request: { headers: request.headers } });
 
@@ -31,12 +31,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-      Run middleware on all routes except:
-      - next static assets
-      - images
-      - favicon
-    */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
