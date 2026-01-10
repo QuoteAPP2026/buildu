@@ -1,8 +1,9 @@
 export const FREE_QUOTE_LIMIT = 10;
 
 type UsageV2 = {
-  sentQuoteIds: string[]; // unique quote IDs that have been sent (any channel)
-  createdAt: string; // first time usage object created
+  createdQuoteIds: string[]; // unique quotes that have been created/saved (counts towards quota)
+  sentQuoteIds: string[];    // optional: track sent quotes for badges/analytics
+  createdAt: string;
 };
 
 function key(userId: string) {
@@ -14,44 +15,70 @@ function safeParse(json: string | null): UsageV2 | null {
   try {
     const v = JSON.parse(json);
     if (!v || typeof v !== "object") return null;
-    const ids = Array.isArray(v.sentQuoteIds) ? v.sentQuoteIds.map(String) : [];
+    const createdQuoteIds = Array.isArray(v.createdQuoteIds) ? v.createdQuoteIds.map(String) : [];
+    const sentQuoteIds = Array.isArray(v.sentQuoteIds) ? v.sentQuoteIds.map(String) : [];
     const createdAt = typeof v.createdAt === "string" ? v.createdAt : new Date().toISOString();
-    return { sentQuoteIds: ids, createdAt };
+    return { createdQuoteIds, sentQuoteIds, createdAt };
   } catch {
     return null;
   }
 }
 
 export function getUsage(userId: string): UsageV2 {
-  if (typeof window === "undefined") return { sentQuoteIds: [], createdAt: new Date().toISOString() };
+  if (typeof window === "undefined") {
+    return { createdQuoteIds: [], sentQuoteIds: [], createdAt: new Date().toISOString() };
+  }
   const existing = safeParse(window.localStorage.getItem(key(userId)));
   if (existing) return existing;
-  const fresh: UsageV2 = { sentQuoteIds: [], createdAt: new Date().toISOString() };
+  const fresh: UsageV2 = { createdQuoteIds: [], sentQuoteIds: [], createdAt: new Date().toISOString() };
   window.localStorage.setItem(key(userId), JSON.stringify(fresh));
   return fresh;
 }
 
-export function getSentCount(userId: string): number {
-  return getUsage(userId).sentQuoteIds.length;
+/** QUOTE QUOTA (counts down on create/save) */
+export function getQuotesUsed(userId: string): number {
+  return getUsage(userId).createdQuoteIds.length;
 }
 
 export function getRemainingSends(userId: string): number {
-  return Math.max(0, FREE_QUOTE_LIMIT - getSentCount(userId));
+  // kept name for compatibility with existing UI; meaning is "remaining free quotes"
+  return Math.max(0, FREE_QUOTE_LIMIT - getQuotesUsed(userId));
 }
 
+export function hasCreatedQuote(userId: string, quoteId: string | number): boolean {
+  const id = String(quoteId);
+  return getUsage(userId).createdQuoteIds.includes(id);
+}
+
+export function canCreateQuote(userId: string, quoteId?: string | number): boolean {
+  // if quote already counted, allow
+  if (quoteId != null && hasCreatedQuote(userId, quoteId)) return true;
+  return getQuotesUsed(userId) < FREE_QUOTE_LIMIT;
+}
+
+export function recordQuoteCreated(userId: string, quoteId: string | number): { used: number; remaining: number } {
+  if (typeof window === "undefined") return { used: 0, remaining: FREE_QUOTE_LIMIT };
+
+  const id = String(quoteId);
+  const u = getUsage(userId);
+
+  if (!u.createdQuoteIds.includes(id)) {
+    u.createdQuoteIds = [...u.createdQuoteIds, id];
+    window.localStorage.setItem(key(userId), JSON.stringify(u));
+  }
+
+  const used = u.createdQuoteIds.length;
+  return { used, remaining: Math.max(0, FREE_QUOTE_LIMIT - used) };
+}
+
+/** SEND TRACKING (does NOT affect quota now) */
 export function hasSentQuote(userId: string, quoteId: string | number): boolean {
   const id = String(quoteId);
   return getUsage(userId).sentQuoteIds.includes(id);
 }
 
-export function canSendQuote(userId: string, quoteId: string | number): boolean {
-  // If it was already sent before, allow re-send without consuming quota
-  if (hasSentQuote(userId, quoteId)) return true;
-  return getSentCount(userId) < FREE_QUOTE_LIMIT;
-}
-
-export function recordQuoteSent(userId: string, quoteId: string | number): { sentCount: number; remaining: number } {
-  if (typeof window === "undefined") return { sentCount: 0, remaining: FREE_QUOTE_LIMIT };
+export function recordQuoteSent(userId: string, quoteId: string | number) {
+  if (typeof window === "undefined") return;
 
   const id = String(quoteId);
   const u = getUsage(userId);
@@ -60,20 +87,14 @@ export function recordQuoteSent(userId: string, quoteId: string | number): { sen
     u.sentQuoteIds = [...u.sentQuoteIds, id];
     window.localStorage.setItem(key(userId), JSON.stringify(u));
   }
-
-  const sentCount = u.sentQuoteIds.length;
-  return { sentCount, remaining: Math.max(0, FREE_QUOTE_LIMIT - sentCount) };
 }
 
-/**
- * Back-compat for earlier code paths (if any still import these).
- * We treat "quotes created" as "quotes sent" in V2, because that's the real business event.
- */
+/** Back-compat for any older imports */
 export async function getQuotesCreated(userId: string): Promise<number> {
-  return getSentCount(userId);
+  return getQuotesUsed(userId);
 }
 
 export async function incrementQuotesCreated(userId: string, quoteId?: string | number): Promise<number> {
-  if (quoteId == null) return getSentCount(userId);
-  return recordQuoteSent(userId, quoteId).sentCount;
+  if (quoteId == null) return getQuotesUsed(userId);
+  return recordQuoteCreated(userId, quoteId).used;
 }

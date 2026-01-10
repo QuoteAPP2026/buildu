@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db, Quote, QuoteStatus, Settings } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/authUser";
+import UpgradeModal from "@/components/UpgradeModal";
+import { canCreateQuote, recordQuoteCreated, getRemainingSends, FREE_QUOTE_LIMIT } from "@/lib/usage";
 import { buildQuoteMessage, calcTotals, money } from "@/lib/quoteMessage";
 import { getActivities } from "@/lib/quoteActions";
 
@@ -18,7 +20,9 @@ export default function NewQuotePage() {
   const router = useRouter();
 
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [userId, setUserId] = useState<string>("");
+  const [userId, setUserId] = useState<string>(" ".trim());
+  const [remaining, setRemaining] = useState<number>(FREE_QUOTE_LIMIT);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const [status, setStatus] = useState<QuoteStatus>("draft");
   const [customerName, setCustomerName] = useState("");
@@ -45,6 +49,7 @@ export default function NewQuotePage() {
       const uid = await getCurrentUserId();
       if (!alive) return;
       setUserId(uid);
+      setRemaining(getRemainingSends(uid));
       const s = await db.settings.get("default");
       if (!alive) return;
       setSettings(s ?? null);
@@ -114,6 +119,11 @@ export default function NewQuotePage() {
 
   async function saveCreate() {
     try {
+      if (!userId) return;
+      if (!canCreateQuote(userId)) {
+        setShowUpgrade(true);
+        return;
+      }
       setSaving(true);
       setErr(null);
 
@@ -150,6 +160,10 @@ export default function NewQuotePage() {
       ];
 
       const id = await db.quotes.add(anyQ as any);
+
+      const r = recordQuoteCreated(userId, id);
+      setRemaining(r.remaining);
+
       router.push(`/app/quotes/${id}`);
     } catch (e: any) {
       console.error(e);

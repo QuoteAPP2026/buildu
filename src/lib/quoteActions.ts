@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { buildQuoteMessage, buildSendTargets } from "@/lib/quoteMessage";
-import { canSendQuote, recordQuoteSent } from "@/lib/usage";
+import { recordQuoteSent, getRemainingSends } from "@/lib/usage";
 
 export type SendChannel = "whatsapp" | "email" | "copy";
 
@@ -30,7 +30,10 @@ export function getActivities(quote: any): QuoteActivity[] {
     .filter((x) => x.type && x.at);
 }
 
-export async function appendActivity(quoteId: number, activity: Omit<QuoteActivity, "id" | "at"> & { at?: string }) {
+export async function appendActivity(
+  quoteId: number,
+  activity: Omit<QuoteActivity, "id" | "at"> & { at?: string }
+) {
   const q = await db.quotes.get(quoteId);
   if (!q) throw new Error("Quote not found");
 
@@ -60,13 +63,6 @@ export async function sendQuoteAndLog(opts: {
   const q = await db.quotes.get(opts.quoteId);
   if (!q) throw new Error("Quote not found");
 
-  // Enforce free quota on SEND (not save)
-  if (!canSendQuote(opts.userId, opts.quoteId)) {
-    const remaining = 0;
-    return { ok: false as const, reason: "limit" as const, remaining };
-  }
-
-  // Ensure userId is attached (so lists stay consistent)
   const next = { ...q } as any;
   next.userId = next.userId ?? opts.userId;
 
@@ -87,13 +83,15 @@ export async function sendQuoteAndLog(opts: {
 
   await db.quotes.put(next);
 
-  // Record usage AFTER successful save
-  const { remaining } = recordQuoteSent(opts.userId, opts.quoteId);
+  // Track "sent" for UI badges/analytics (NOT quota)
+  recordQuoteSent(opts.userId, opts.quoteId);
 
-  // Build message + send targets
   const settings = await db.settings.get("default");
   const message = buildQuoteMessage(settings ?? null, next);
   const targets = buildSendTargets(message, String(next.customerName ?? "Customer"));
+
+  // remaining is now "remaining free quotes"
+  const remaining = getRemainingSends(opts.userId);
 
   return { ok: true as const, remaining, message, targets, quote: next };
 }

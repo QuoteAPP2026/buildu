@@ -6,7 +6,7 @@ import { db, Quote, QuoteStatus, Settings } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/authUser";
 import UpgradeModal from "@/components/UpgradeModal";
 import { buildQuoteMessage, calcTotals, money } from "@/lib/quoteMessage";
-import { getRemainingSends, hasSentQuote, FREE_QUOTE_LIMIT } from "@/lib/usage";
+import { getRemainingSends, hasSentQuote, FREE_QUOTE_LIMIT, recordQuoteCreated, hasCreatedQuote } from "@/lib/usage";
 import { sendQuoteAndLog, getActivities, SendChannel } from "@/lib/quoteActions";
 
 type Line = {
@@ -513,7 +513,7 @@ export default function QuoteDetailPage() {
 
         <Card title="Preview">
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={() => navigator.clipboard.writeText(message)} style={btn("secondary")}>Copy preview text</button>
+            <button onClick={() => doSend("copy")} style={btn("secondary")}>Copy preview text</button>
           </div>
           <pre style={preview()}>{message}</pre>
         </Card>
