@@ -6,6 +6,7 @@ export type Lead = {
   id?: number;
   createdAt: string;
   updatedAt: string;
+  userId?: string;
 
   name: string;
   phone?: string;
@@ -30,15 +31,14 @@ export type Quote = {
   id?: number;
   createdAt: string;
   updatedAt: string;
+  userId?: string;
 
-  // link back to a lead (optional)
   leadId?: number;
 
   customerName: string;
   address?: string;
   notes?: string;
 
-  /* V1 voice support */
   transcript?: string;
   source?: "voice" | "manual";
 
@@ -52,8 +52,8 @@ export type Job = {
   id?: number;
   createdAt: string;
   updatedAt: string;
+  userId?: string;
 
-  // link back to quote/lead (optional)
   leadId?: number;
   quoteId?: number;
 
@@ -62,7 +62,7 @@ export type Job = {
   notes?: string;
 
   stage: JobStage;
-  scheduledFor?: string; // ISO date/time
+  scheduledFor?: string;
 };
 
 export type Settings = {
@@ -73,6 +73,15 @@ export type Settings = {
   address?: string;
   terms?: string;
   updatedAt?: string;
+  userId?: string;
+};
+
+// NEW: usage counters that do not decrease on deletes
+export type Usage = {
+  id: string; // `${userId}:usage`
+  userId: string;
+  quotesCreated: number;
+  updatedAt: string;
 };
 
 class BuildUDb extends Dexie {
@@ -81,33 +90,48 @@ class BuildUDb extends Dexie {
   jobs!: Table<Job, number>;
   settings!: Table<Settings, "default">;
 
+  // NEW
+  usage!: Table<Usage, string>;
+
   constructor() {
     super("buildu");
 
-    // v1: leads
     this.version(1).stores({
       leads: "++id, createdAt, updatedAt, status, name, phone, jobType",
     });
 
-    // v2: quotes
     this.version(2).stores({
       leads: "++id, createdAt, updatedAt, status, name, phone, jobType",
       quotes: "++id, createdAt, updatedAt, status, customerName, leadId",
     });
 
-    // v3: jobs
     this.version(3).stores({
       leads: "++id, createdAt, updatedAt, status, name, phone, jobType",
       quotes: "++id, createdAt, updatedAt, status, customerName, leadId",
       jobs: "++id, createdAt, updatedAt, stage, customerName, quoteId, leadId, scheduledFor",
     });
 
-    // v4: settings (quote template)
     this.version(4).stores({
       leads: "++id, createdAt, updatedAt, status, name, phone, jobType",
       quotes: "++id, createdAt, updatedAt, status, customerName, leadId",
       jobs: "++id, createdAt, updatedAt, stage, customerName, quoteId, leadId, scheduledFor",
       settings: "id",
+    });
+
+    this.version(5).stores({
+      leads: "++id, createdAt, updatedAt, userId, status, name, phone, jobType",
+      quotes: "++id, createdAt, updatedAt, userId, status, customerName, leadId",
+      jobs: "++id, createdAt, updatedAt, userId, stage, customerName, quoteId, leadId, scheduledFor",
+      settings: "id, userId",
+    });
+
+    // v6: usage counters
+    this.version(6).stores({
+      leads: "++id, createdAt, updatedAt, userId, status, name, phone, jobType",
+      quotes: "++id, createdAt, updatedAt, userId, status, customerName, leadId",
+      jobs: "++id, createdAt, updatedAt, userId, stage, customerName, quoteId, leadId, scheduledFor",
+      settings: "id, userId",
+      usage: "id, userId",
     });
   }
 }
