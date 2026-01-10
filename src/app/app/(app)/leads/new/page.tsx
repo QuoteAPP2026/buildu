@@ -130,7 +130,7 @@ const card: React.CSSProperties = {
 
 const grid2: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   gap: 12,
 };
 
