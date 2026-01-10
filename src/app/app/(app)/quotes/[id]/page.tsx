@@ -312,7 +312,7 @@ export default function QuoteDetailPage() {
 
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: 16, paddingBottom: 110 }}>
-      {showUpgrade ? <UpgradeModal isOpen={true} onClose={() => setShowUpgrade(false)} /> : null}
+      {showUpgrade ? <UpgradeModal open={true} onClose={() => setShowUpgrade(false)} /> : null}
 
       <div style={topBar()}>
         <div style={{ display: "grid", gap: 6 }}>
