@@ -4,13 +4,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db, Quote, QuoteStatus, Settings } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/authUser";
-import { getCurrentUserId } from "@/lib/authUser";
 
 type Line = {
   id?: string;
   description?: string;
   qty?: number | string;
-  unitPrice?: number | string; // Value per unit
+  unitPrice?: number | string;
 };
 
 type SpeechRec = any;
@@ -30,18 +29,15 @@ export default function NewQuotePage() {
   const [settings, setSettings] = useState<Settings | null>(null);
 
   const [status, setStatus] = useState<QuoteStatus>("draft");
-
   const [customerName, setCustomerName] = useState("");
   const [address, setAddress] = useState("");
 
-  // Speech / transcript (NOW ABOVE ITEMS)
+  // Speech / transcript ABOVE items
   const [transcript, setTranscript] = useState("");
   const [listening, setListening] = useState(false);
   const recRef = useRef<SpeechRec | null>(null);
 
-  const [lines, setLines] = useState<Line[]>([
-    { id: uid(), description: "", qty: 1, unitPrice: 0 },
-  ]);
+  const [lines, setLines] = useState<Line[]>([{ id: uid(), description: "", qty: 1, unitPrice: 0 }]);
 
   // VAT off by default
   const [vatEnabled, setVatEnabled] = useState(false);
@@ -137,11 +133,7 @@ export default function NewQuotePage() {
     return Number.isFinite(v) ? v : 0;
   }, [vatRate]);
 
-  const vatAmount = useMemo(
-    () => (vatEnabled ? subtotal * vatRateNum : 0),
-    [subtotal, vatEnabled, vatRateNum]
-  );
-
+  const vatAmount = useMemo(() => (vatEnabled ? subtotal * vatRateNum : 0), [subtotal, vatEnabled, vatRateNum]);
   const computedTotal = useMemo(() => subtotal + vatAmount, [subtotal, vatAmount]);
 
   const effectiveTotal = useMemo(() => {
@@ -192,20 +184,7 @@ ${notes || "—"}
 
 Transcript:
 ${transcript || "—"}${termsBlock}`.trim();
-  }, [
-    settings,
-    customerName,
-    address,
-    lines,
-    subtotal,
-    vatEnabled,
-    vatRateNum,
-    vatAmount,
-    effectiveTotal,
-    totalOverride,
-    notes,
-    transcript,
-  ]);
+  }, [settings, customerName, address, lines, subtotal, vatEnabled, vatRateNum, vatAmount, effectiveTotal, totalOverride, notes, transcript]);
 
   async function saveQuote() {
     try {
@@ -237,15 +216,19 @@ ${transcript || "—"}${termsBlock}`.trim();
         unitPrice: Number(l.unitPrice) || 0,
       }));
 
-      const id = (const __uid = await getCurrentUserId();
-      (quote as any).userId = __uid;
-      await db.quotes.add()q as any);
+      // IMPORTANT: quotes list is scoped by userId
+      (q as any).userId = await getCurrentUserId();
+
+      const id = await db.quotes.add(q as any);
+      if (!id) throw new Error("Save failed (no ID returned)");
 
       setSavedMsg("Saved ✓");
       setTimeout(() => setSavedMsg(null), 1400);
 
+      // No bounce to quote detail (removes “save again” feeling)
       router.replace("/app/quotes");
     } catch (e: any) {
+      console.error(e);
       setErr(e?.message ?? "Failed to save quote.");
     } finally {
       setSaving(false);
@@ -397,16 +380,9 @@ ${transcript || "—"}${termsBlock}`.trim();
             </div>
 
             <Field label="Override total (optional)">
-              <input
-                value={totalOverride}
-                onChange={(e) => setTotalOverride(e.target.value)}
-                style={input()}
-                inputMode="decimal"
-                placeholder={money(computedTotal)}
-              />
+              <input value={totalOverride} onChange={(e) => setTotalOverride(e.target.value)} style={input()} inputMode="decimal" placeholder={money(computedTotal)} />
             </Field>
 
-            {/* SECOND SAVE BUTTON (UNDER ITEMS) */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               {savedMsg ? <div style={{ fontWeight: 900, opacity: 0.9 }}>{savedMsg}</div> : null}
               <button disabled={saving} onClick={saveQuote} style={btn("save")}>
@@ -433,7 +409,6 @@ ${transcript || "—"}${termsBlock}`.trim();
         </Card>
       </div>
 
-      {/* Sticky bottom bar (third save option) */}
       <div style={stickyBar()}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between" }}>
           <div style={{ display: "grid" }}>
@@ -488,11 +463,8 @@ function btn(kind: "primary" | "secondary" | "danger" | "mic" | "save") {
   };
 
   if (kind === "danger") return { ...base, border: "1px solid rgba(255,140,140,0.25)", background: "rgba(255,90,90,0.12)" };
-
-  // Green buttons (Mic + Save)
   if (kind === "mic") return { ...base, border: "1px solid rgba(34,197,94,0.35)", background: "rgba(34,197,94,0.18)" };
   if (kind === "save") return { ...base, border: "1px solid rgba(34,197,94,0.40)", background: "rgba(34,197,94,0.22)" };
-
   if (kind === "primary") return { ...base, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(90,140,255,0.22)" };
   return base;
 }
