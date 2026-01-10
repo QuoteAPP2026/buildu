@@ -1,76 +1,57 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-
-type InstallState = {
-  isStandalone: boolean;
-  isIOS: boolean;
-  isAndroidLike: boolean;
-  canPrompt: boolean;
-};
+import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 export default function AppEntryPage() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [installState, setInstallState] = useState<InstallState>({
-    isStandalone: false,
-    isIOS: false,
-    isAndroidLike: false,
-    canPrompt: false,
-  });
-
-  const [allowContinue, setAllowContinue] = useState(false);
-
-  const nextHref = useMemo(() => "/auth/register", []);
-  const loginHref = useMemo(() => "/auth/login", []);
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    const isStandalone =
-      window.matchMedia?.("(display-mode: standalone)")?.matches ||
-      // @ts-expect-error iOS Safari legacy
-      window.navigator.standalone === true;
+    let alive = true;
 
-    const ua = navigator.userAgent || "";
-    const isIOS = /iPhone|iPad|iPod/i.test(ua);
-    const isAndroidLike = /Android/i.test(ua);
-
-    setInstallState((s) => ({ ...s, isStandalone, isIOS, isAndroidLike }));
-
-    // If already installed, go straight to auth.
-    if (isStandalone) {
-      window.location.href = nextHref;
-      return;
-    }
-
-    const onBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setInstallState((s) => ({ ...s, canPrompt: true }));
-    };
-
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!alive) return;
+      if (data?.session?.user) window.location.href = "/app/dashboard";
+    })();
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      alive = false;
     };
-  }, [nextHref]);
+  }, [supabase]);
 
-  async function handleInstall() {
-    // Android/Chrome: trigger native prompt
-    if (deferredPrompt) {
-      try {
-        deferredPrompt.prompt();
-        await deferredPrompt.userChoice;
-      } catch {
-        // ignore
-      } finally {
-        setDeferredPrompt(null);
-        setInstallState((s) => ({ ...s, canPrompt: false }));
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    setLoading(true);
+
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+
+      if (!cleanEmail || !password) {
+        setMsg("Please enter your email and password.");
+        return;
       }
-      return;
-    }
 
-    // iOS: can't trigger install — show instructions only
-    setAllowContinue(true);
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signUp({ email: cleanEmail, password });
+        if (error) throw error;
+      }
+
+      window.location.href = "/app/dashboard";
+    } catch (err: any) {
+      setMsg(err?.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -86,66 +67,59 @@ export default function AppEntryPage() {
           </div>
 
           <div style={hero}>
-            <div style={heroTitle}>Install the app first</div>
+            <div style={heroTitle}>
+              {mode === "signin" ? "Sign in to your workspace" : "Create your workspace"}
+            </div>
             <div style={heroBody}>
-              BuildU works best from your Home Screen — faster, cleaner, and feels like a real app.
+              Create quotes fast, edit in seconds, then send by WhatsApp, SMS or email.
             </div>
           </div>
 
-          <div style={{ display: "grid", gap: 10 }}>
-            <button style={primaryBtn} type="button" onClick={handleInstall}>
-              Install BuildU
+          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 10, marginTop: 12 }}>
+            <label style={label}>
+              Email
+              <input
+                style={input}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                inputMode="email"
+                autoComplete="email"
+                placeholder="name@company.co.uk"
+              />
+            </label>
+
+            <label style={label}>
+              Password
+              <input
+                style={input}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                placeholder="Minimum 6 characters"
+              />
+            </label>
+
+            {msg ? <div style={msgBox}>{msg}</div> : null}
+
+            <button style={primaryBtn} type="submit" disabled={loading}>
+              {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
             </button>
 
-            {!installState.isIOS ? (
-              <div style={hint}>
-                {installState.canPrompt
-                  ? "Tap “Install BuildU” to open the install prompt."
-                  : "If you don’t see an install prompt, open this page in Chrome and try again."}
-              </div>
-            ) : (
-              <div style={iosBox}>
-                <div style={{ fontWeight: 950, marginBottom: 6 }}>On iPhone (Safari)</div>
-                <ol style={ol}>
-                  <li>Tap the <b>Share</b> icon</li>
-                  <li>Select <b>Add to Home Screen</b></li>
-                  <li>Open BuildU from your Home Screen</li>
-                </ol>
-                <div style={hint}>Apple doesn’t allow websites to auto-install — users must do it once.</div>
-              </div>
-            )}
-          </div>
-
-          <div style={divider} />
-
-          <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ fontWeight: 950, letterSpacing: -0.2 }}>Already installed?</div>
-            <div style={hint}>
-              Open BuildU from your Home Screen icon. If you’re seeing this page again, you’re still in the browser.
-            </div>
-          </div>
-
-          {/* Optional escape hatch */}
-          <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-            <button style={ghostBtn} type="button" onClick={() => setAllowContinue(true)}>
-              Continue in browser
+            <button
+              type="button"
+              style={ghostBtn}
+              onClick={() => setMode((m) => (m === "signin" ? "signup" : "signin"))}
+              disabled={loading}
+            >
+              {mode === "signin" ? "Create account" : "I already have an account"}
             </button>
+          </form>
 
-            {allowContinue ? (
-              <div style={authCard}>
-                <div style={{ fontWeight: 950, marginBottom: 6 }}>Continue</div>
-                <div style={hint}>You can still use BuildU in the browser, but install is recommended.</div>
-
-                <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                  <a style={linkBtnPrimary} href={nextHref}>
-                    Create account
-                  </a>
-                  <a style={linkBtnGhost} href={loginHref}>
-                    Sign in
-                  </a>
-                </div>
-              </div>
-            ) : null}
+          <div style={bullets}>
+            <div style={bullet}><span style={dot} />Mobile-first. Built for one-handed use on site.</div>
+            <div style={bullet}><span style={dot} />Voice → Quote → Edit → Send. No clutter.</div>
+            <div style={bullet}><span style={dot} />Install later from Safari/Chrome for fastest access.</div>
           </div>
         </div>
 
@@ -168,10 +142,7 @@ const bg: React.CSSProperties = {
   padding: "18px 12px",
 };
 
-const wrap: React.CSSProperties = {
-  width: "100%",
-  maxWidth: 520,
-};
+const wrap: React.CSSProperties = { width: "100%", maxWidth: 520 };
 
 const card: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.11)",
@@ -182,11 +153,7 @@ const card: React.CSSProperties = {
   padding: 16,
 };
 
-const brandRow: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-};
+const brandRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 12 };
 
 const mark: React.CSSProperties = {
   width: 42,
@@ -199,39 +166,31 @@ const mark: React.CSSProperties = {
   boxShadow: "0 16px 40px rgba(59,130,246,0.20), 0 14px 34px rgba(20,184,166,0.14)",
 };
 
-const title: React.CSSProperties = {
-  fontWeight: 980,
-  letterSpacing: -0.5,
-  fontSize: 18,
-  lineHeight: 1.05,
-};
-
-const sub: React.CSSProperties = {
-  opacity: 0.74,
-  fontSize: 12.75,
-  marginTop: 3,
-};
+const title: React.CSSProperties = { fontWeight: 980, letterSpacing: -0.5, fontSize: 18, lineHeight: 1.05 };
+const sub: React.CSSProperties = { opacity: 0.74, fontSize: 12.75, marginTop: 3 };
 
 const hero: React.CSSProperties = {
   marginTop: 14,
   padding: 14,
   borderRadius: 18,
   border: "1px solid rgba(255,255,255,0.10)",
-  background:
-    "linear-gradient(135deg, rgba(59,130,246,0.18), rgba(20,184,166,0.10)), rgba(0,0,0,0.14)",
+  background: "linear-gradient(135deg, rgba(59,130,246,0.18), rgba(20,184,166,0.10)), rgba(0,0,0,0.14)",
 };
 
-const heroTitle: React.CSSProperties = {
-  fontWeight: 980,
-  letterSpacing: -0.35,
-  fontSize: 16,
-};
+const heroTitle: React.CSSProperties = { fontWeight: 980, letterSpacing: -0.35, fontSize: 16 };
+const heroBody: React.CSSProperties = { opacity: 0.82, fontSize: 13, lineHeight: 1.45, marginTop: 6 };
 
-const heroBody: React.CSSProperties = {
-  opacity: 0.82,
-  fontSize: 13,
-  lineHeight: 1.45,
-  marginTop: 6,
+const label: React.CSSProperties = { display: "grid", gap: 6, fontSize: 12.75, opacity: 0.9 };
+
+const input: React.CSSProperties = {
+  width: "100%",
+  borderRadius: 16,
+  padding: "12px 12px",
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "rgba(0,0,0,0.20)",
+  color: "rgba(238,245,255,0.95)",
+  outline: "none",
+  fontSize: 15,
 };
 
 const primaryBtn: React.CSSProperties = {
@@ -258,76 +217,36 @@ const ghostBtn: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const hint: React.CSSProperties = {
-  opacity: 0.75,
+const msgBox: React.CSSProperties = {
+  padding: 10,
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(255,255,255,0.06)",
   fontSize: 12.75,
+  opacity: 0.9,
   lineHeight: 1.35,
 };
 
-const iosBox: React.CSSProperties = {
-  marginTop: 4,
-  padding: 12,
-  borderRadius: 18,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(0,0,0,0.16)",
-};
-
-const ol: React.CSSProperties = {
-  margin: "8px 0 0 18px",
-  padding: 0,
+const bullets: React.CSSProperties = {
+  marginTop: 14,
+  paddingTop: 12,
+  borderTop: "1px solid rgba(255,255,255,0.10)",
   display: "grid",
-  gap: 6,
-  opacity: 0.9,
+  gap: 8,
+  opacity: 0.78,
   fontSize: 13,
   lineHeight: 1.35,
 };
 
-const divider: React.CSSProperties = {
-  height: 1,
-  margin: "16px 0",
-  background: "rgba(255,255,255,0.10)",
+const bullet: React.CSSProperties = { display: "flex", gap: 10, alignItems: "flex-start" };
+const dot: React.CSSProperties = {
+  marginTop: 6,
+  width: 9,
+  height: 9,
+  borderRadius: 99,
+  background: "rgba(34,211,238,0.95)",
+  boxShadow: "0 10px 24px rgba(34,211,238,0.18)",
+  flex: "0 0 auto",
 };
 
-const authCard: React.CSSProperties = {
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(255,255,255,0.045)",
-  borderRadius: 18,
-  padding: 12,
-};
-
-const linkBtnPrimary: React.CSSProperties = {
-  display: "inline-flex",
-  justifyContent: "center",
-  alignItems: "center",
-  width: "100%",
-  borderRadius: 18,
-  padding: "12px 14px",
-  fontWeight: 980,
-  letterSpacing: -0.25,
-  border: "1px solid rgba(255,255,255,0.16)",
-  background: "linear-gradient(135deg, rgba(59,130,246,0.85), rgba(20,184,166,0.60))",
-  color: "rgba(238,245,255,0.95)",
-  textDecoration: "none",
-};
-
-const linkBtnGhost: React.CSSProperties = {
-  display: "inline-flex",
-  justifyContent: "center",
-  alignItems: "center",
-  width: "100%",
-  borderRadius: 18,
-  padding: "12px 14px",
-  fontWeight: 950,
-  letterSpacing: -0.2,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(0,0,0,0.18)",
-  color: "rgba(238,245,255,0.92)",
-  textDecoration: "none",
-};
-
-const foot: React.CSSProperties = {
-  marginTop: 12,
-  textAlign: "center",
-  opacity: 0.55,
-  fontSize: 12.5,
-};
+const foot: React.CSSProperties = { marginTop: 12, textAlign: "center", opacity: 0.55, fontSize: 12.5 };
